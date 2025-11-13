@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'features/auth/presentation/pages/login_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const TextRecognitionScreen(),
+      home: LoginScreen(),
       debugShowCheckedModeBanner: false, // Untuk menyembunyikan banner "Debug"
     );
   }
