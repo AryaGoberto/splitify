@@ -1,22 +1,24 @@
 // File: lib/features/auth/presentation/pages/login_page.dart
 
 import 'package:flutter/material.dart';
+import './signup_page.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
-    // Warna dasar dari desain Anda
     const Color darkBlue = Color(0xFF000518);
     const Color primaryColor = Color(0xFF3B5BFF); // Biru Tombol Login
 
     return Scaffold(
       backgroundColor: darkBlue,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: <Widget>[
-          // --- 1. Latar Belakang Abstrak Kiri Atas ---
-          // Ini mereplikasi elemen geometris di kiri atas layar (seperti di Splash Screen)
-          // Untuk kesederhanaan, kita gunakan Container dengan Gradient.
-          // Untuk akurasi penuh, Anda mungkin perlu CustomPainter atau SVG.
           Positioned(
             top: -50,
             left: -50,
@@ -35,149 +37,128 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          // --- 2. Konten Utama (Form Login) ---
           SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 80.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                const SizedBox(height: 50),
-
-                // Judul Utama
-                const Text(
-                  'LOGIN TO\nYOUR ACCOUNT',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Sub Judul
-                const Text(
-                  'Enter your login information',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-                const SizedBox(height: 50),
-
-                // --- Input Email ---
-                _buildInputField(
-                  hint: 'oliverosa@gmail.com',
-                  icon: Icons.email_outlined,
-                  isObscure: false,
-                ),
-                const SizedBox(height: 20),
-
-                // --- Input Password ---
-                _buildInputField(
-                  hint: 'Password',
-                  icon: Icons.lock_outline,
-                  isObscure: true,
-                  suffixIcon: Icons.remove_red_eye_outlined,
-                ),
-                const SizedBox(height: 10),
-
-                // Checkbox "Remember me" dan "Forgot Password"
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: true,
-                          onChanged: (val) {},
-                          activeColor: primaryColor,
-                          side: const BorderSide(color: Colors.white70),
-                        ),
-                        const Text(
-                          'Remember me',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 40.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const SizedBox(height: 20),
+                  const Text(
+                    'LOGIN TO\nYOUR ACCOUNT',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text(
-                        'Forgot password',
-                        style: TextStyle(color: primaryColor),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Enter your login information',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildInputField(
+                    hint: 'oliverosa@gmail.com',
+                    icon: Icons.email_outlined,
+                    isObscure: false,
+                  ),
+                  const SizedBox(height: 20),
+
+                  _buildInputField(
+                    hint: 'Password',
+                    icon: Icons.lock_outline,
+                    isObscure: true,
+                    suffixIcon: Icons.remove_red_eye_outlined,
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: true,
+                            onChanged: (val) {},
+                            activeColor: primaryColor,
+                            side: const BorderSide(color: Colors.white70),
+                          ),
+                          const Text(
+                            'Remember me',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-
-                // --- Tombol Login Utama ---
-                ElevatedButton(
-                  onPressed: () {
-                    // Logika Login
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'LOGIN',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Divider "Or"
-                const Center(
-                  child: Text('Or', style: TextStyle(color: Colors.grey)),
-                ),
-                const SizedBox(height: 20),
-
-                // --- Tombol Social Login ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildSocialButton(
-                      'G GOOGLE',
-                      'assets/google.png',
-                    ), // Asumsi ada gambar Google
-                    _buildSocialButton(
-                      ' APPLE',
-                      'assets/apple.png',
-                    ), // Asumsi ada gambar Apple
-                  ],
-                ),
-                const SizedBox(height: 30),
-
-                // Link Sign Up
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      "Don't have an account?",
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Navigasi ke SignUpPage
-                      },
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontWeight: FontWeight.bold,
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'Forgot password',
+                          style: TextStyle(color: primaryColor),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ],
-                ),
-              ],
+                    child: const Text(
+                      'LOGIN',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Center(
+                    child: Text('Or', style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildSocialButton('G GOOGLE', 'assets/google.png'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Don't have an account?",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SignUpScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -185,7 +166,6 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  // Widget Pembantu untuk Input Field
   Widget _buildInputField({
     required String hint,
     required IconData icon,
@@ -212,7 +192,6 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  // Widget Pembantu untuk Tombol Sosial
   Widget _buildSocialButton(String text, String imagePath) {
     return Expanded(
       child: OutlinedButton(
