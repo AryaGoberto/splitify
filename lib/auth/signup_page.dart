@@ -1,11 +1,6 @@
-// File: lib/features/auth/presentation/pages/signup_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// Import LoginScreen dari file login_page.dart
 import './login_page.dart';
-// Asumsi halaman home adalah Placeholder()
-// import '../../../../home/presentation/pages/home_page.dart';
 import '../page/home_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -17,7 +12,6 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  // 1. Form Handling: Controllers dan Key
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -57,12 +51,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       await userCredential.user?.updateDisplayName(_nameController.text.trim());
 
-      // Jika berhasil, navigasi ke Home Page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const HomeScreen(),
-        ), // Ganti dengan HomePage() Anda
+        ),
       );
     } on FirebaseAuthException catch (e) {
       debugPrint(
@@ -72,7 +65,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         SnackBar(content: Text('Pendaftaran Gagal: ${e.code} — ${e.message}')),
       );
     } catch (e, st) {
-      // Tangkap error lain dan tampilkan info lengkap di log
       debugPrint('Unexpected error during signUp: $e');
       debugPrint(st.toString());
       ScaffoldMessenger.of(

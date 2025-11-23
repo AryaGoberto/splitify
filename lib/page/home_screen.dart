@@ -148,8 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
             ),
             const SizedBox(height: 20),
-
-            // Tombol Pick Image
             ElevatedButton(
               onPressed: _isProcessing ? null : _pickImage,
               style: ElevatedButton.styleFrom(
