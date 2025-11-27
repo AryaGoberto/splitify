@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:splitify/page/history_screen.dart';
-import 'package:splitify/page/home_page.dart';
+import 'package:splitify/page/home_screen.dart';
 import 'package:splitify/page/scan_struk_page.dart';
-import './notifications_page.dart';
+import 'notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,10 +17,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Halaman sesuai tab
   static const List<Widget> _pages = <Widget>[
-    HomeTabPage(),
+    HomeScreen(),
     HistoryScreen(),
-    NotificationsPage(),
-    ProfilePage(),
+    NotificationsScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -149,8 +149,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
