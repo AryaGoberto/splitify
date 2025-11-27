@@ -6,14 +6,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class ScanStrukPage extends StatefulWidget {
+  const ScanStrukPage({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<ScanStrukPage> createState() => _ScanStrukPageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _ScanStrukPageState extends State<ScanStrukPage> {
   File? _imageFile;
   late final TextRecognizer _textRecognizer;
   String _recognizedText = "Belum ada teks yang diekstrak.";

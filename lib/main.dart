@@ -6,6 +6,7 @@ import 'dart:io';
 // Firebase Imports
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:splitify/page/dashboard_screen.dart';
 import 'firebase_options.dart';
 
 // Halaman-halaman fitur
@@ -78,12 +79,12 @@ class AuthGate extends StatelessWidget {
         // Jika user sudah login (User ada)
         if (snapshot.hasData && snapshot.data != null) {
           // Navigasi ke Halaman Utama (Text Recognition/Home)
-          return const TextRecognitionScreen();
+          return const DashboardScreen();
         }
 
         // Jika user belum login (User null)
         // Navigasi ke halaman Login
-        return LoginScreen();
+        return DashboardScreen();
       },
     );
   }

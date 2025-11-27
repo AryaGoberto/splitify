@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:splitify/page/dashboard_screen.dart';
 import './login_page.dart';
-import '../page/home_screen.dart';
+import '../page/scan_struk_page.dart';
 
 class SignUpScreen extends StatefulWidget {
   // Ubah nama kelas menjadi SignUpScreen agar konsisten
@@ -54,7 +55,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
+          builder: (context) => const DashboardScreen(),
         ),
       );
     } on FirebaseAuthException catch (e) {
