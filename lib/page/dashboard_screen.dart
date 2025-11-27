@@ -48,12 +48,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(child: _pages[_selectedIndex]),
 
       // FAB bulat di tengah, nembus BottomAppBar
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'scan-fab',
-        backgroundColor: primaryColor,
-        shape: const CircleBorder(),
-        onPressed: _navigateToScanPage,
-        child: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 1),
+        child: FloatingActionButton(
+          heroTag: 'scan-fab',
+          backgroundColor: primaryColor,
+          shape: const CircleBorder(),
+          onPressed: _navigateToScanPage,
+          child: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
+        ),   
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
