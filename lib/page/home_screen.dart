@@ -152,14 +152,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Halo $_userName 👋',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     // Ikon Notifikasi (Mirip dengan desain)
                     IconButton(
                       icon: const Icon(
-                        Icons.notifications_none_outlined,
+                        Icons.group_add_rounded,
                         color: Colors.white,
                         size: 28,
                       ),
@@ -206,21 +206,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // --- 2. Floating Button: Buat Aktivitas Baru (Sesuai Desain Mockup) ---
           Align(
-            alignment: Alignment.bottomCenter,
+            alignment: Alignment.bottomRight,
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 20.0),
+              padding: const EdgeInsets.all(10.0),
               child: ElevatedButton.icon(
                 onPressed: () => _navigateAndCreateActivity(context),
                 icon: const Icon(Icons.add, color: Colors.white),
                 label: const Text(
                   'Buat Aktivitas Baru',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
+                    horizontal: 20,
+                    vertical:15,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
