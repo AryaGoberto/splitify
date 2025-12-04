@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:splitify/auth/login_page.dart';
 import 'package:splitify/auth/signup_page.dart';
 import 'package:splitify/services/user_service.dart';
+import 'package:splitify/page/account_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -135,14 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         backgroundColor: darkBlue,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            size: 18,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         centerTitle: true,
         title: const Text(
           'Profile',
@@ -398,8 +392,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconBgColor: primaryColor.withOpacity(0.15),
                   iconColor: primaryColor,
                   title: 'Account Settings',
-                  onTap: () {
-                    // TODO: Navigate to Account Settings
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AccountSettingsScreen(),
+                      ),
+                    );
+                    if (result == true) {
+                      _loadProfileData();
+                    }
                   },
                 ),
                 _buildDivider(),
