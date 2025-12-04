@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class UserService {
   final _firestore = FirebaseFirestore.instance;
@@ -149,8 +151,10 @@ class UserService {
       email: email,
       password: password,
     );
-
     await currentUser.reauthenticateWithCredential(credential);
+
+    // Hapus data user dari Firestore
+    await _firestore.collection('users').doc(currentUser.uid).delete();
 
     // Hapus user dari Authentication
     await currentUser.delete();
@@ -175,5 +179,45 @@ class UserService {
     await _firestore.collection('users').doc(currentUser.uid).update({
       'email': newEmail,
     });
+  }
+
+  // 📸 Upload Profile Picture
+  Future<String> uploadProfilePicture(File imageFile) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login untuk mengupload foto profil.',
+      );
+    }
+
+    try {
+      // 1. Upload ke Firebase Storage
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('user_profile_images')
+          .child('${currentUser.uid}.jpg');
+
+      await ref.putFile(imageFile);
+      final downloadUrl = await ref.getDownloadURL();
+
+      // 2. Update Photo URL di FirebaseAuth
+      await currentUser.updatePhotoURL(downloadUrl);
+
+      // 3. Update Photo URL di Firestore
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'photoUrl': downloadUrl,
+      });
+
+      return downloadUrl;
+    } catch (e) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'UPLOAD_FAILED',
+        message: 'Gagal mengupload foto profil: $e',
+      );
+    }
   }
 }
