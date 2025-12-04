@@ -3,6 +3,7 @@ import 'package:splitify/page/history_screen.dart';
 import 'package:splitify/page/home_screen.dart';
 import 'package:splitify/page/scan_struk_page.dart';
 import 'notifications_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -118,17 +119,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text("Halaman Profil", style: TextStyle(color: Colors.white)),
     );
   }
 }

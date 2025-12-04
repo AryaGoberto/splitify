@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:splitify/page/dashboard_screen.dart';
 import './login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../page/scan_struk_page.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -43,20 +45,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // Panggil Firebase create user
+      final String name = _nameController.text.trim();
+      final String email = _emailController.text.trim();
+      final String normalizedEmail = email.toLowerCase();
+
+      // 1️⃣ Buat akun di Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
+            email: normalizedEmail,
             password: _passwordController.text.trim(),
           );
 
-      await userCredential.user?.updateDisplayName(_nameController.text.trim());
+      final user = userCredential.user!;
+      await user.updateDisplayName(name);
 
+      // 2️⃣ Buat dokumen user di Firestore: users/<uid>
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'email':
+            normalizedEmail, // penting: lowercase, cocok dengan UserService.findUserByEmail
+        'name': name,
+        'friends': <String>[], // array kosong
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 3️⃣ (opsional) bisa juga update photoUrl nanti kalau sudah ada
+
+      // 4️⃣ Navigate ke Dashboard
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const DashboardScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
       );
     } on FirebaseAuthException catch (e) {
       debugPrint(
