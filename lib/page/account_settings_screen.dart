@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:splitify/services/user_service.dart';
-import 'package:splitify/page/change_password_screen.dart';
+import 'package:splitify/page/mainPage/.dart';
 import 'package:splitify/auth/login_page.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
