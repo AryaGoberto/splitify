@@ -182,7 +182,6 @@ class _TextRecognitionScreenState extends State<TextRecognitionScreen> {
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
-    // AuthGate akan otomatis menangani navigasi kembali ke LoginScreen
   }
 
   @override
@@ -262,7 +261,6 @@ class _TextRecognitionScreenState extends State<TextRecognitionScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: SelectableText(
-                // Gunakan SelectableText agar teks bisa dicopy
                 _recognizedText,
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
@@ -273,4 +271,3 @@ class _TextRecognitionScreenState extends State<TextRecognitionScreen> {
     );
   }
 }
-// -----------------------------------------------------------------------------
