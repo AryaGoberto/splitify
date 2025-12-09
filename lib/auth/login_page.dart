@@ -138,6 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+
   Widget _buildInputField({
     required String hint,
     required IconData icon,
@@ -166,28 +167,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton({
-    required String text,
-    required String imagePath,
-    required VoidCallback? onPressed,
-  }) {
-    return Expanded(
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          side: const BorderSide(color: Colors.white54),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-        ),
-      ),
-    );
-  }
   // UI
   @override
   Widget build(BuildContext context) {
@@ -343,20 +322,29 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Center(
-                      child: Text('Or', style: TextStyle(color: Colors.grey)),
+                      child: Text(
+                        'Or continue with',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildSocialButton(
-                          text: 'G GOOGLE',
-                          imagePath: 'assets/google.png',
-                          onPressed: _isLoading ? null : _signInWithGoogle,
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        icon: const Icon(Icons.g_mobiledata, size: 24),
+                        label: const Text('Sign in with Google'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF000000),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Row(
