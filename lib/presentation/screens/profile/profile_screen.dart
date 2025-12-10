@@ -1,15 +1,15 @@
-// lib/features/profile/presentation/profile_screen.dart
-
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:splitify/presentation/screens/auth/login_page.dart';
 import 'package:splitify/presentation/screens/auth/signup_page.dart';
 import 'package:splitify/services/user_service.dart';
 import 'package:splitify/presentation/screens/profile/account_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/notification_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/privacy_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/help_support_screen.dart';
+import 'package:splitify/presentation/screens/profile/tos_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -25,11 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
-  bool _isUploadingPhoto = false;
 
   Map<String, dynamic>? _userData;
-
-  final ImagePicker _picker = ImagePicker();
 
   // Color scheme
   static const Color darkBlue = Color(0xFF000518);
@@ -41,89 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfileData();
-  }
-
-  Future<void> _pickAndUploadPhoto() async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      final picked = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-      if (picked == null) return;
-
-      setState(() => _isUploadingPhoto = true);
-
-      final downloadUrl = await _userService.uploadProfilePicture(
-        File(picked.path),
-      );
-
-      setState(() {
-        _userData = {...?_userData, 'photoUrl': downloadUrl};
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto profil berhasil diubah')),
-        );
-        _showPhotoPreview(downloadUrl);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal upload foto: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isUploadingPhoto = false);
-      }
-    }
-  }
-
-  void _showPhotoPreview(String photoUrl) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: const EdgeInsets.all(16),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Preview Foto Profil',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  photoUrl,
-                  width: 180,
-                  height: 180,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tutup', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _loadProfileData() async {
@@ -427,38 +341,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               )
                             : null,
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: InkWell(
-                          onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _isUploadingPhoto
-                                  ? Colors.grey
-                                  : primaryColor,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: cardColor, width: 3),
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: _isUploadingPhoto
-                                ? const SizedBox(
-                                    height: 16,
-                                    width: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.edit,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -514,7 +396,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Notification Settings',
                   onTap: () {
-                    // TODO: Navigate to Notification Settings
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const NotificationSettingsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -533,7 +421,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Privacy Settings',
                   onTap: () {
-                    // TODO: Navigate to Privacy Settings
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrivacySettingsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -552,7 +445,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Help & Support',
                   onTap: () {
-                    // TODO: Navigate to Help & Support
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HelpSupportScreen(),
+                      ),
+                    );
                   },
                 ),
                 _buildDivider(),
@@ -562,7 +460,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Terms of Service',
                   onTap: () {
-                    // TODO: Navigate to Terms of Service
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TosScreen(),
+                      ),
+                    );
                   },
                 ),
               ],

@@ -234,7 +234,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'This will change the email address you use to log in. In the future, you may need to choose email login instead of signing in with Apple, Facebook, or Google.',
+                    'This will change the email address you use to log in. In the future, you may need to choose email login instead of signing in with Google.',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
