@@ -54,12 +54,13 @@ class _ScanStrukState extends State<ScanStruk> {
 
   void _processScannedData() {
     final items = widget.scannedData['items'] ?? [];
-    final taxValue = widget.scannedData['tax'];
-    _taxPercent = (taxValue is num ? taxValue.toDouble() : 0.0);
+
+    // Set pajak dan service ke 0 di awal (user bisa edit manual)
+    _taxPercent = 0.0;
     _taxNominal = 0.0;
-    final serviceValue = widget.scannedData['service'];
-    _servicePercent = (serviceValue is num ? serviceValue.toDouble() : 0.0);
+    _servicePercent = 0.0;
     _serviceNominal = 0.0;
+
     final discountValue = widget.scannedData['discount'];
     _discountNominal = (discountValue is num ? discountValue.toDouble() : 0.0);
 
