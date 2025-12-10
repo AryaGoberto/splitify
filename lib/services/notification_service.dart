@@ -32,29 +32,36 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    print('🔔 Initializing Notification Service...');
+    try {
+      print('🔔 Initializing Notification Service...');
 
-    // 1. Request permission
-    final settings = await _requestPermission();
-    if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-      print('❌ Notification permission denied');
-      return;
+      // 1. Request permission
+      final settings = await _requestPermission();
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+        print('⚠️ Notification permission not granted');
+        _isInitialized = true; // Mark as initialized to prevent retry loops
+        return;
+      }
+
+      // 2. Initialize local notifications
+      await _initializeLocalNotifications();
+
+      // 3. Get FCM token
+      await _getFCMToken();
+
+      // 4. Setup message handlers
+      _setupMessageHandlers();
+
+      // 5. Subscribe to topics (optional)
+      await _subscribeToTopics();
+
+      _isInitialized = true;
+      print('✅ Notification Service initialized successfully');
+    } catch (e, stackTrace) {
+      print('❌ Notification Service initialization failed: $e');
+      print('Stack trace: $stackTrace');
+      _isInitialized = true; // Mark as initialized to prevent app crash
     }
-
-    // 2. Initialize local notifications
-    await _initializeLocalNotifications();
-
-    // 3. Get FCM token
-    await _getFCMToken();
-
-    // 4. Setup message handlers
-    _setupMessageHandlers();
-
-    // 5. Subscribe to topics (optional)
-    await _subscribeToTopics();
-
-    _isInitialized = true;
-    print('✅ Notification Service initialized');
   }
 
   /// Request notification permission
@@ -114,36 +121,49 @@ class NotificationService {
         print('🔄 FCM Token refreshed: $newToken');
       });
     } catch (e) {
-      print('❌ Failed to get FCM token: $e');
+      print('⚠️ Failed to get FCM token: $e');
+      print('⚠️ This device may not have Google Play Services installed');
+      print('⚠️ Continuing without push notifications...');
+      // Don't rethrow - app should still work without FCM
     }
   }
 
   /// Setup message handlers
   void _setupMessageHandlers() {
-    // 1. Foreground messages (app is open)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('📬 Foreground message received');
-      print('   Title: ${message.notification?.title}');
-      print('   Body: ${message.notification?.body}');
-      print('   Data: ${message.data}');
-      _showLocalNotification(message);
-    });
+    try {
+      // 1. Foreground messages (app is open)
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('📬 Foreground message received');
+        print('   Title: ${message.notification?.title}');
+        print('   Body: ${message.notification?.body}');
+        print('   Data: ${message.data}');
+        _showLocalNotification(message);
+      });
 
-    // 2. Background/Terminated messages (user taps notification)
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('🚀 Message opened app from background');
-      print('   Data: ${message.data}');
-      _handleNotificationTap(message);
-    });
-
-    // 3. Check if app was opened from terminated state
-    _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
-      if (message != null) {
-        print('🚀 App opened from terminated state');
+      // 2. Background/Terminated messages (user taps notification)
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print('🚀 Message opened app from background');
         print('   Data: ${message.data}');
         _handleNotificationTap(message);
-      }
-    });
+      });
+
+      // 3. Check if app was opened from terminated state
+      _firebaseMessaging
+          .getInitialMessage()
+          .then((RemoteMessage? message) {
+            if (message != null) {
+              print('🚀 App opened from terminated state');
+              print('   Data: ${message.data}');
+              _handleNotificationTap(message);
+            }
+          })
+          .catchError((e) {
+            print('⚠️ Error checking initial message: $e');
+          });
+    } catch (e) {
+      print('⚠️ Error setting up message handlers: $e');
+      // Don't rethrow - this is optional functionality
+    }
   }
 
   /// Show local notification
@@ -247,24 +267,35 @@ class NotificationService {
 
   /// Show receipt OCR completion notification
   Future<void> showReceiptOCRCompleteNotification(int itemCount) async {
-    final androidDetails = AndroidNotificationDetails(
-      'receipt_channel',
-      'Receipt OCR',
-      channelDescription: 'Notifications for receipt OCR completion',
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-      enableVibration: true,
-      playSound: true,
-    );
+    try {
+      // Check if initialized and permission granted
+      if (!_isInitialized) {
+        print('⚠️ NotificationService not initialized, skipping notification');
+        return;
+      }
 
-    final details = NotificationDetails(android: androidDetails);
+      final androidDetails = AndroidNotificationDetails(
+        'receipt_channel',
+        'Receipt OCR',
+        channelDescription: 'Notifications for receipt OCR completion',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        enableVibration: true,
+        playSound: true,
+      );
 
-    await _localNotifications.show(
-      1, // Unique ID for receipt notifications
-      '✅ Receipt OCR Complete',
-      '$itemCount items extracted! Ready to review.',
-      details,
-    );
+      final details = NotificationDetails(android: androidDetails);
+
+      await _localNotifications.show(
+        1, // Unique ID for receipt notifications
+        '✅ Receipt OCR Complete',
+        '$itemCount items extracted! Ready to review.',
+        details,
+      );
+    } catch (e) {
+      print('❌ Failed to show notification: $e');
+      // Don't rethrow - we don't want to crash the app if notification fails
+    }
   }
 }

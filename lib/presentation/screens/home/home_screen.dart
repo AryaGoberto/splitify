@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:splitify/presentation/screens/friends/add-friends-screen.dart';
+import 'package:splitify/presentation/screens/friends/add_friends/screen/add-friends-screen.dart';
 import 'package:splitify/presentation/screens/friends/friends_list_screen.dart';
 import 'package:splitify/services/activity_service.dart';
 import '../activities/create_activity_screen.dart';

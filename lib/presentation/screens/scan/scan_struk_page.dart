@@ -173,13 +173,17 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
       try {
         print('🚀 Attempting Gemini OCR...');
+        print('📁 Image path: ${_capturedImage!.path}');
+        print('📏 Image size: ${await _capturedImage!.length()} bytes');
 
         // Memanggil GeminiOCRService.extractReceiptData yang dijamin mengembalikan Map valid
-
         data = await _geminiOCR.extractReceiptData(_capturedImage!);
+
+        print('✅ Gemini returned data: $data');
       } catch (geminiError) {
         // Catch jika terjadi masalah koneksi, API key, atau error di luar parsing
         print('❌ Gemini OCR failed: $geminiError');
+        print('🔍 Error type: ${geminiError.runtimeType}');
         print('⚠️ Falling back to MLKit text recognition...');
 
         // Langsung fallback ke MLKit - extract raw text saja
@@ -192,6 +196,10 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
       final items = data['items'] as List? ?? [];
       final total = (data['total'] as num?)?.toDouble() ?? 0.0;
       final subtotal = (data['subtotal'] as num?)?.toDouble() ?? 0.0;
+
+      print(
+        '📋 Extracted: ${items.length} items, Total: $total, Subtotal: $subtotal',
+      );
 
       // Jika items kosong tapi ada total/subtotal, buat generic item
       if (items.isEmpty && (total > 0 || subtotal > 0)) {

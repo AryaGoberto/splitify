@@ -115,6 +115,9 @@ class ActivityService {
         .get();
     final inviterName = inviterDoc.data()?['name'] ?? 'Someone';
 
+    // List untuk track invited UIDs
+    List<String> invitedUids = [];
+
     // Kirim invitasi ke setiap member UID (exclude pembuat)
     for (final memberUid in memberUids) {
       if (memberUid == createdByUid) continue; // Skip pembuat aktivitas
@@ -130,6 +133,8 @@ class ActivityService {
           'respondedAt': null,
         });
 
+        invitedUids.add(memberUid); // Track invited UIDs
+
         // 🔔 Kirim push notification
         await _pushNotificationService.sendActivityInvitationNotification(
           toUserId: memberUid,
@@ -141,7 +146,18 @@ class ActivityService {
         print('Error sending invitation to $memberUid: $e');
       }
     }
-  } // 📖 Ambil semua aktivitas user
+
+    // 📝 Update activity dengan list invitedUids (untuk read permission di Firestore)
+    if (invitedUids.isNotEmpty) {
+      try {
+        await _firestore.collection('activities').doc(activityId).update({
+          'invitedUids': invitedUids,
+        });
+      } catch (e) {
+        print('Error updating invitedUids: $e');
+      }
+    }
+  } // 📖 Ambil semua aktivitas user (created + invited)
 
   Future<List<Map<String, dynamic>>> getUserActivities() async {
     final currentUser = _auth.currentUser;
@@ -155,14 +171,55 @@ class ActivityService {
     }
 
     try {
-      final snapshot = await _firestore
+      // 1. Ambil aktivitas yang dibuat user
+      final createdSnapshot = await _firestore
           .collection('activities')
           .where('createdBy', isEqualTo: currentUser.uid)
           .orderBy('activityDate', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      final activities = createdSnapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+
+      // 2. Ambil aktivitas yang user invited ke (dari accepted invitations)
+      final invitationsSnapshot = await _firestore
+          .collection('activityInvitations')
+          .where('invitedUid', isEqualTo: currentUser.uid)
+          .where('status', isEqualTo: 'accepted')
+          .get();
+
+      for (final invDoc in invitationsSnapshot.docs) {
+        final invData = invDoc.data();
+        final activityId = invData['activityId'] as String?;
+
+        if (activityId != null) {
+          final activityDoc = await _firestore
+              .collection('activities')
+              .doc(activityId)
+              .get();
+
+          if (activityDoc.exists) {
+            // Tambahkan ke list jika belum ada (cek berdasarkan ID)
+            if (!activities.any((act) => act['id'] == activityId)) {
+              activities.add({'id': activityDoc.id, ...activityDoc.data()!});
+            }
+          }
+        }
+      }
+
+      // Sort semua aktivitas by date
+      activities.sort((a, b) {
+        final dateA =
+            (a['activityDate'] as Timestamp?)?.toDate() ?? DateTime.now();
+        final dateB =
+            (b['activityDate'] as Timestamp?)?.toDate() ?? DateTime.now();
+        return dateB.compareTo(dateA); // descending
+      });
+
+      return activities;
     } catch (e) {
+      print('❌ Error in getUserActivities: $e');
       throw FirebaseException(
         plugin: 'ActivityService',
         code: 'GET_ACTIVITIES_ERROR',

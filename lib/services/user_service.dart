@@ -8,15 +8,33 @@ import 'package:http/http.dart' as http;
 import '../config/cloudinary_config.dart';
 import 'push_notification_service.dart';
 
+/// Kelas layanan yang menangani semua operasi terkait pengguna,
+/// autentikasi, pertemanan, dan undangan kegiatan.
 class UserService {
   final PushNotificationService _pushNotificationService =
       PushNotificationService();
-  final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // 🔍 Cari user berdasarkan email (Menggunakan normalisasi email)
+  /// Mengambil UID pengguna yang saat ini login.
+  String? get _currentUid => _auth.currentUser?.uid;
+
+  /// Memastikan pengguna saat ini terautentikasi.
+  /// Melempar [FirebaseException] jika tidak ada user yang login.
+  void _ensureAuthenticated() {
+    if (_currentUid == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login.',
+      );
+    }
+  }
+
+  // --- [ 1. AUTENTIKASI & PROFIL DASAR ] ---
+
+  /// 🔍 Mencari user di Firestore berdasarkan email yang dinormalisasi.
   Future<Map<String, dynamic>?> findUserByEmail(String email) async {
-    // Normalisasi email menjadi huruf kecil untuk pencarian yang konsisten
     final normalizedEmail = email.toLowerCase().trim();
 
     final result = await _firestore
@@ -28,28 +46,172 @@ class UserService {
     if (result.docs.isEmpty) return null;
 
     final doc = result.docs.first;
-    final data = doc.data();
-    data['uid'] = doc.id; // tambahkan UID user
+    final Map<String, dynamic> data = doc.data();
+    data['uid'] = doc.id; // Tambahkan UID user
     return data;
   }
 
-  // ➕ Kirim Friend Request (Menggantikan addFriend langsung)
-  Future<void> sendFriendRequest(String friendUid) async {
+  /// ✏️ Mengupdate nama tampilan (display name) user di Firebase Auth dan Firestore.
+  Future<void> updateUserProfile({required String name}) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      _ensureAuthenticated(); // Throw jika null
+      return;
+    }
+
+    // 1. Update Display Name di FirebaseAuth
+    await currentUser.updateDisplayName(name);
+
+    // 2. Update Name di Firestore
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'name': name,
+    });
+  }
+
+  /// 🔒 Mengubah password user, memerlukan re-autentikasi.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
     final currentUser = _auth.currentUser;
 
-    // Pengecekan: Pastikan pengguna sedang login dan tidak mencoba menambah diri sendiri
-    if (currentUser == null || currentUser.uid == friendUid) {
+    if (currentUser == null || currentUser.email == null) {
       throw FirebaseException(
         plugin: 'UserService',
-        code: 'INVALID_FRIEND_ID',
+        code: 'NOT_ALLOWED',
         message:
-            'User tidak terautentikasi atau mencoba menambah diri sendiri.',
+            'User tidak terautentikasi atau tidak menggunakan login email.',
       );
     }
 
-    final currentUid = currentUser.uid;
+    final credential = EmailAuthProvider.credential(
+      email: currentUser.email!,
+      password: currentPassword,
+    );
 
-    // Cek apakah sudah berteman
+    await currentUser.reauthenticateWithCredential(credential);
+    await currentUser.updatePassword(newPassword);
+  }
+
+  /// 📧 Mengganti email user, akan mengirim verifikasi ke email baru.
+  Future<void> updateEmail({required String newEmail}) async {
+    final currentUser = _auth.currentUser;
+    _ensureAuthenticated();
+
+    // 1. Update email di Authentication (Mengirim verifikasi)
+    await currentUser!.verifyBeforeUpdateEmail(newEmail);
+
+    // 2. Update email di Firestore (Ini akan di-update ke email baru yang belum terverifikasi)
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'email': newEmail.toLowerCase().trim(),
+    });
+  }
+
+  /// 🗑️ Menghapus akun user secara permanen dari Auth dan Firestore.
+  Future<void> deleteAccount({required String password}) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null || currentUser.email == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_ALLOWED',
+        message:
+            'User tidak terautentikasi atau tidak menggunakan login email.',
+      );
+    }
+
+    final credential = EmailAuthProvider.credential(
+      email: currentUser.email!,
+      password: password,
+    );
+    await currentUser.reauthenticateWithCredential(credential);
+
+    // Hapus data user dari Firestore
+    await _firestore.collection('users').doc(currentUser.uid).delete();
+
+    // Hapus user dari Authentication
+    await currentUser.delete();
+  }
+
+  // --- [ 2. UPLOAD FOTO PROFIL ] ---
+
+  /// 📸 Mengupload foto profil ke Cloudinary dan memperbarui URL di Firebase.
+  Future<String> uploadProfilePicture(File imageFile) async {
+    final currentUser = _auth.currentUser;
+    _ensureAuthenticated();
+
+    try {
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/image/upload',
+      );
+
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['upload_preset'] = CloudinaryConfig.uploadPreset;
+
+      if (CloudinaryConfig.folder.isNotEmpty) {
+        request.fields['folder'] = CloudinaryConfig.folder;
+      }
+
+      request.fields['public_id'] = currentUser!.uid;
+
+      request.files.add(
+        await http.MultipartFile.fromPath('file', imageFile.path),
+      );
+
+      final response = await http.Response.fromStream(await request.send());
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        final body = jsonDecode(response.body);
+        throw FirebaseException(
+          plugin: 'UserService',
+          code: 'UPLOAD_FAILED',
+          message:
+              'Cloudinary error ${response.statusCode}: ${body['error']['message'] ?? response.body}',
+        );
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final downloadUrl = decoded['secure_url'] as String?;
+
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        throw FirebaseException(
+          plugin: 'UserService',
+          code: 'NO_URL',
+          message: 'Cloudinary tidak mengembalikan secure_url',
+        );
+      }
+
+      await currentUser.updatePhotoURL(downloadUrl);
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'photoUrl': downloadUrl,
+      });
+
+      return downloadUrl;
+    } catch (e) {
+      if (e is FirebaseException) rethrow;
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'UPLOAD_FAILED',
+        message: 'Gagal mengupload foto profil: $e',
+      );
+    }
+  }
+
+  // --- [ 3. PERTEMANAN & FRIEND REQUEST ] ---
+
+  /// ➕ Mengirim friend request ke user lain.
+  Future<void> sendFriendRequest(String friendUid) async {
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
+
+    if (currentUid == friendUid) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'INVALID_FRIEND_ID',
+        message: 'Tidak dapat menambah diri sendiri.',
+      );
+    }
+
     final currentUserDoc = await _firestore
         .collection('users')
         .doc(currentUid)
@@ -63,7 +225,6 @@ class UserService {
       );
     }
 
-    // Cek apakah request sudah ada
     final existingRequest = await _firestore
         .collection('friendRequests')
         .where('fromUid', isEqualTo: currentUid)
@@ -80,15 +241,27 @@ class UserService {
       );
     }
 
-    // Buat friend request baru
+    final reverseRequest = await _firestore
+        .collection('friendRequests')
+        .where('fromUid', isEqualTo: friendUid)
+        .where('toUid', isEqualTo: currentUid)
+        .where('status', isEqualTo: 'pending')
+        .limit(1)
+        .get();
+
+    if (reverseRequest.docs.isNotEmpty) {
+      final requestId = reverseRequest.docs.first.id;
+      await acceptFriendRequest(requestId, friendUid);
+      return;
+    }
+
     await _firestore.collection('friendRequests').add({
       'fromUid': currentUid,
       'toUid': friendUid,
-      'status': 'pending', // pending, accepted, declined
+      'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // 🔔 Kirim push notification
     final senderDoc = await _firestore
         .collection('users')
         .doc(currentUid)
@@ -102,408 +275,210 @@ class UserService {
     );
   }
 
-  // 📨 Get Incoming Friend Requests (yang diterima user)
-  Future<List<Map<String, dynamic>>> getIncomingFriendRequests() async {
-    final currentUser = _auth.currentUser;
+  /// 📩 Mengambil stream permintaan pertemanan yang masuk (pending) secara real-time.
+  Stream<List<Map<String, dynamic>>> streamIncomingFriendRequests() {
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
 
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
+    return _firestore
+        .collection('friendRequests')
+        .where('toUid', isEqualTo: currentUid)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final Map<String, dynamic> data = doc.data();
+            data['requestId'] = doc.id;
+            return data;
+          }).toList();
+        });
+  }
+
+  /// 📨 Mengambil daftar permintaan pertemanan yang masuk (pending) dengan data sender.
+  Future<List<Map<String, dynamic>>> getIncomingFriendRequests() async {
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
 
     final snapshot = await _firestore
         .collection('friendRequests')
-        .where('toUid', isEqualTo: currentUser.uid)
+        .where('toUid', isEqualTo: currentUid)
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: true)
         .get();
 
-    List<Map<String, dynamic>> requests = [];
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      data['requestId'] = doc.id;
+    final userIds = snapshot.docs
+        .map((e) => e.data()['fromUid'] as String)
+        .toSet();
+    final userDataMap = <String, Map<String, dynamic>>{};
 
-      // Ambil data sender
-      final senderDoc = await _firestore
-          .collection('users')
-          .doc(data['fromUid'])
-          .get();
-      if (senderDoc.exists) {
-        data['senderData'] = senderDoc.data();
+    // Mengambil data user secara paralel
+    for (final uid in userIds) {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        userDataMap[uid] = doc.data()!;
+      }
+    }
+
+    List<Map<String, dynamic>> requests = [];
+    for (final doc in snapshot.docs) {
+      final Map<String, dynamic> data = doc.data();
+      data['requestId'] = doc.id;
+      final senderUid = data['fromUid'] as String;
+
+      if (userDataMap.containsKey(senderUid)) {
+        data['senderData'] = userDataMap[senderUid];
       }
 
       requests.add(data);
     }
-
     return requests;
   }
 
-  // ✅ Accept Friend Request
+  /// ✅ Menerima Friend Request dan menambahkan kedua user ke daftar teman.
   Future<void> acceptFriendRequest(String requestId, String fromUid) async {
-    final currentUser = _auth.currentUser;
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
 
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
-
-    // Gunakan transaction untuk memastikan atomicity
     await _firestore.runTransaction((transaction) async {
-      // 1. Update status request menjadi accepted
       final requestRef = _firestore.collection('friendRequests').doc(requestId);
+      final currentUserRef = _firestore.collection('users').doc(currentUid);
+      final friendRef = _firestore.collection('users').doc(fromUid);
+
+      // 1. Tulis: Update status request
       transaction.update(requestRef, {
         'status': 'accepted',
         'respondedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Tambahkan ke daftar friends kedua user
-      final currentUserRef = _firestore
-          .collection('users')
-          .doc(currentUser.uid);
+      // 2. Tulis: Tambahkan teman ke daftar user saat ini
       transaction.update(currentUserRef, {
         'friends': FieldValue.arrayUnion([fromUid]),
       });
 
-      final friendRef = _firestore.collection('users').doc(fromUid);
+      // 3. Tulis: Tambahkan user saat ini ke daftar teman si pengirim
       transaction.update(friendRef, {
-        'friends': FieldValue.arrayUnion([currentUser.uid]),
+        'friends': FieldValue.arrayUnion([currentUid]),
       });
     });
   }
 
-  // ❌ Decline Friend Request
+  /// ❌ Menolak Friend Request.
   Future<void> declineFriendRequest(String requestId) async {
-    final currentUser = _auth.currentUser;
+    _ensureAuthenticated();
 
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
-
-    // Update status request menjadi declined
     await _firestore.collection('friendRequests').doc(requestId).update({
       'status': 'declined',
       'respondedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  // 🔄 Cancel Friend Request (hapus request yang kita kirim)
+  /// 🔄 Membatalkan Friend Request yang dikirim (menghapus dokumen request).
   Future<void> cancelFriendRequest(String requestId) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
-
+    _ensureAuthenticated();
     await _firestore.collection('friendRequests').doc(requestId).delete();
   }
 
-  // 👥 Ambil daftar teman user saat ini (Menambah pengecekan null safety)
+  /// 👥 Mengambil daftar UID teman user saat ini.
   Future<List<String>> getFriends() async {
-    final currentUser = _auth.currentUser;
+    _ensureAuthenticated();
 
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk melihat daftar teman.',
-      );
-    }
-
-    final uid = currentUser.uid;
-    final snapshot = await _firestore.collection('users').doc(uid).get();
-
-    final data = snapshot.data();
-    // Menggunakan safe cast (List<String>.from)
-    return List<String>.from(data?['friends'] ?? []);
-  }
-
-  // ✏️ Update user profile (Name)
-  Future<void> updateUserProfile({required String name}) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk mengupdate profil.',
-      );
-    }
-
-    // 1. Update Display Name di FirebaseAuth
-    await currentUser.updateDisplayName(name);
-
-    // 2. Update Name di Firestore
-    await _firestore.collection('users').doc(currentUser.uid).update({
-      'name': name,
-    });
-  }
-
-  // 🔒 Ganti Password
-  Future<void> changePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk mengganti password.',
-      );
-    }
-
-    final email = currentUser.email;
-    if (email == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NO_EMAIL',
-        message: 'User tidak memiliki email.',
-      );
-    }
-
-    // Re-authenticate user
-    final credential = EmailAuthProvider.credential(
-      email: email,
-      password: currentPassword,
-    );
-
-    await currentUser.reauthenticateWithCredential(credential);
-
-    // Update password
-    await currentUser.updatePassword(newPassword);
-  }
-
-  // 🗑️ Hapus Akun
-  Future<void> deleteAccount({required String password}) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk menghapus akun.',
-      );
-    }
-
-    final email = currentUser.email;
-    if (email == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NO_EMAIL',
-        message: 'User tidak memiliki email.',
-      );
-    }
-
-    // Re-authenticate user
-    final credential = EmailAuthProvider.credential(
-      email: email,
-      password: password,
-    );
-    await currentUser.reauthenticateWithCredential(credential);
-
-    // Hapus data user dari Firestore
-    await _firestore.collection('users').doc(currentUser.uid).delete();
-
-    // Hapus user dari Authentication
-    await currentUser.delete();
-  }
-
-  // 📧 Ganti Email
-  Future<void> updateEmail({required String newEmail}) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk mengganti email.',
-      );
-    }
-
-    // Update email di Authentication (Mengirim verifikasi)
-    await currentUser.verifyBeforeUpdateEmail(newEmail);
-
-    // Update email di Firestore
-    await _firestore.collection('users').doc(currentUser.uid).update({
-      'email': newEmail,
-    });
-  }
-
-  // 📸 Upload Profile Picture
-  Future<String> uploadProfilePicture(File imageFile) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login untuk mengupload foto profil.',
-      );
-    }
-
-    try {
-      // 1) Upload ke Cloudinary via unsigned upload preset
-      final uri = Uri.parse(
-        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/image/upload',
-      );
-
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['upload_preset'] = CloudinaryConfig.uploadPreset;
-
-      if (CloudinaryConfig.folder.isNotEmpty) {
-        request.fields['folder'] = CloudinaryConfig.folder;
-      }
-
-      // Gunakan UID agar mudah dilacak, tapi biarkan Cloudinary membuat versi unik jika sudah ada
-      request.fields['public_id'] = currentUser.uid;
-
-      request.files.add(
-        await http.MultipartFile.fromPath('file', imageFile.path),
-      );
-
-      final response = await http.Response.fromStream(await request.send());
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw FirebaseException(
-          plugin: 'UserService',
-          code: 'UPLOAD_FAILED',
-          message: 'Cloudinary error ${response.statusCode}: ${response.body}',
-        );
-      }
-
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final downloadUrl = decoded['secure_url'] as String?;
-
-      if (downloadUrl == null || downloadUrl.isEmpty) {
-        throw FirebaseException(
-          plugin: 'UserService',
-          code: 'NO_URL',
-          message: 'Cloudinary tidak mengembalikan secure_url',
-        );
-      }
-
-      // 2. Update Photo URL di FirebaseAuth
-      await currentUser.updatePhotoURL(downloadUrl);
-
-      // 3. Update Photo URL di Firestore
-      await _firestore.collection('users').doc(currentUser.uid).update({
-        'photoUrl': downloadUrl,
-      });
-
-      return downloadUrl;
-    } catch (e) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'UPLOAD_FAILED',
-        message: 'Gagal mengupload foto profil: $e',
-      );
-    }
-  }
-
-  // 👥 Get Friends Data Lengkap (dengan info user)
-  Future<List<Map<String, dynamic>>> getFriendsData() async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
-
-    final userDoc = await _firestore
+    final snapshot = await _firestore
         .collection('users')
-        .doc(currentUser.uid)
+        .doc(_currentUid)
         .get();
+
+    return List<String>.from(snapshot.data()?['friends'] ?? []);
+  }
+
+  /// 👥 Mengambil data lengkap dari semua teman user saat ini.
+  Future<List<Map<String, dynamic>>> getFriendsData() async {
+    _ensureAuthenticated();
+
+    final userDoc = await _firestore.collection('users').doc(_currentUid).get();
     final friendUids = List<String>.from(userDoc.data()?['friends'] ?? []);
 
-    List<Map<String, dynamic>> friendsData = [];
+    final futures = friendUids
+        .map((friendUid) => _firestore.collection('users').doc(friendUid).get())
+        .toList();
 
-    for (final friendUid in friendUids) {
-      final friendDoc = await _firestore
-          .collection('users')
-          .doc(friendUid)
-          .get();
-      if (friendDoc.exists) {
-        final data = friendDoc.data()!;
-        data['uid'] = friendUid;
+    final friendDocs = await Future.wait(futures);
+
+    List<Map<String, dynamic>> friendsData = [];
+    for (var doc in friendDocs) {
+      if (doc.exists) {
+        final Map<String, dynamic> data = doc.data()!;
+        data['uid'] = doc.id;
         friendsData.add(data);
       }
     }
-
     return friendsData;
   }
 
-  // 📩 Get Activity Invitations (Notifikasi aktivitas dari teman)
-  Future<List<Map<String, dynamic>>> getActivityInvitations() async {
-    final currentUser = _auth.currentUser;
+  // --- [ 4. INVITASI AKTIVITAS ] ---
 
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
+  /// 📨 Mengambil stream undangan kegiatan yang masuk (pending) secara real-time.
+  Stream<List<Map<String, dynamic>>> streamActivityInvitations() {
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
+
+    return _firestore
+        .collection('activityInvitations')
+        .where('invitedUid', isEqualTo: currentUid)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final Map<String, dynamic> data = doc.data();
+            data['invitationId'] = doc.id;
+            return data;
+          }).toList();
+        });
+  }
+
+  /// 📩 Mengambil daftar undangan kegiatan yang masuk dengan data lengkap (invitor & activity).
+  Future<List<Map<String, dynamic>>> getActivityInvitations() async {
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
 
     try {
       final snapshot = await _firestore
           .collection('activityInvitations')
-          .where('invitedUid', isEqualTo: currentUser.uid)
+          .where('invitedUid', isEqualTo: currentUid)
           .where('status', isEqualTo: 'pending')
           .orderBy('createdAt', descending: true)
           .get();
 
       final invitations = <Map<String, dynamic>>[];
+      final invitorUids = <String>{};
+      final activityIds = <String>{};
 
       for (final doc in snapshot.docs) {
         final data = doc.data();
-        final invitorUid = data['invitorUid'] as String?;
+        if (data['invitorUid'] is String) invitorUids.add(data['invitorUid']);
+        if (data['activityId'] is String) activityIds.add(data['activityId']);
+      }
 
-        // Ambil data invitor
-        if (invitorUid != null) {
-          final invitorDoc = await _firestore
-              .collection('users')
-              .doc(invitorUid)
-              .get();
+      // ** PERBAIKAN TANGGUH: Menggunakan loop for-async dengan try-catch **
+      // Ini untuk menghindari error 'permission-denied' memblokir seluruh notifikasi.
+      final invitorMap = await _fetchUsersInSafeBatch(invitorUids);
+      final activityMap = await _fetchActivitiesInSafeBatch(activityIds);
 
-          if (invitorDoc.exists) {
-            final invitorData = invitorDoc.data()!;
-            data['invitorData'] = invitorData;
-          }
-        }
-
-        // Ambil data aktivitas
-        final activityId = data['activityId'] as String?;
-        if (activityId != null) {
-          final activityDoc = await _firestore
-              .collection('activities')
-              .doc(activityId)
-              .get();
-
-          if (activityDoc.exists) {
-            final activityData = activityDoc.data()!;
-            data['activityData'] = activityData;
-          }
-        }
-
+      for (final doc in snapshot.docs) {
+        final Map<String, dynamic> data = doc.data();
         data['invitationId'] = doc.id;
+
+        final invitorUid = data['invitorUid'] as String?;
+        if (invitorUid != null && invitorMap.containsKey(invitorUid)) {
+          data['invitorData'] = invitorMap[invitorUid];
+        }
+
+        final activityId = data['activityId'] as String?;
+        if (activityId != null && activityMap.containsKey(activityId)) {
+          data['activityData'] = activityMap[activityId];
+        }
+
         invitations.add(data);
       }
 
@@ -517,46 +492,81 @@ class UserService {
     }
   }
 
-  // ✅ Accept Activity Invitation
+  // Fungsi Helper untuk mengambil data user secara aman
+  Future<Map<String, Map<String, dynamic>>> _fetchUsersInSafeBatch(
+    Set<String> uids,
+  ) async {
+    final Map<String, Map<String, dynamic>> userMap = {};
+    for (final uid in uids) {
+      try {
+        final doc = await _firestore.collection('users').doc(uid).get();
+        if (doc.exists) {
+          userMap[uid] = doc.data()!;
+        }
+      } catch (e) {
+        print('Warning: Gagal membaca data user $uid: $e');
+      }
+    }
+    return userMap;
+  }
+
+  // Fungsi Helper untuk mengambil data activity secara aman
+  Future<Map<String, Map<String, dynamic>>> _fetchActivitiesInSafeBatch(
+    Set<String> ids,
+  ) async {
+    final Map<String, Map<String, dynamic>> activityMap = {};
+    for (final id in ids) {
+      try {
+        final doc = await _firestore.collection('activities').doc(id).get();
+        if (doc.exists) {
+          activityMap[id] = doc.data()!;
+        }
+      } catch (e) {
+        print('Warning: Gagal membaca data activity $id: $e');
+      }
+    }
+    return activityMap;
+  }
+
+  /// ✅ Menerima undangan kegiatan dan menambahkan user ke daftar anggota kegiatan.
   Future<void> acceptActivityInvitation(
     String invitationId,
     String activityId,
   ) async {
-    final currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw FirebaseException(
-        plugin: 'UserService',
-        code: 'NOT_AUTHENTICATED',
-        message: 'User harus login.',
-      );
-    }
+    _ensureAuthenticated();
+    final currentUid = _currentUid!;
 
     try {
-      // Update invitation status
-      await _firestore
-          .collection('activityInvitations')
-          .doc(invitationId)
-          .update({
-            'status': 'accepted',
-            'respondedAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.runTransaction((transaction) async {
+        final invitationRef = _firestore
+            .collection('activityInvitations')
+            .doc(invitationId);
+        final activityRef = _firestore.collection('activities').doc(activityId);
 
-      // Tambahkan user ke members aktivitas (jika belum ada)
-      final activityDoc = await _firestore
-          .collection('activities')
-          .doc(activityId)
-          .get();
+        // --- 1. OPERASI BACA ---
+        // Baca activityDoc untuk memastikan keberadaan dan validitas (jika perlu)
+        final activityDoc = await transaction.get(activityRef);
 
-      if (activityDoc.exists) {
-        final members = List<String>.from(activityDoc.data()?['members'] ?? []);
-        if (!members.contains(currentUser.displayName)) {
-          members.add(currentUser.displayName ?? 'Unknown');
-          await _firestore.collection('activities').doc(activityId).update({
-            'members': members,
+        // --- 2. OPERASI TULIS ---
+
+        // 2a. Update invitation status menjadi accepted
+        transaction.update(invitationRef, {
+          'status': 'accepted',
+          'respondedAt': FieldValue.serverTimestamp(),
+        });
+
+        // 2b. Update activity document (hanya jika activity ada)
+        if (activityDoc.exists) {
+          transaction.update(activityRef, {
+            'members': FieldValue.arrayUnion([
+              currentUid,
+            ]), // Tambahkan ke members
+            'invitedUids': FieldValue.arrayUnion([
+              currentUid,
+            ]), // Tambahkan ke invitedUids
           });
         }
-      }
+      });
     } catch (e) {
       throw FirebaseException(
         plugin: 'UserService',
@@ -566,8 +576,10 @@ class UserService {
     }
   }
 
-  // ❌ Decline Activity Invitation
+  /// ❌ Menolak undangan kegiatan.
   Future<void> declineActivityInvitation(String invitationId) async {
+    _ensureAuthenticated();
+
     try {
       await _firestore
           .collection('activityInvitations')

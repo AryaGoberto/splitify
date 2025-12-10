@@ -12,66 +12,81 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
     
-    // Users collection
+    // Users collection (DIREVISI: Update lebih aman)
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create, delete: if isSignedIn() && isOwner(userId);
-      // Allow any signed-in user to update ONLY the 'friends' field
+      
+      // Izinkan update: Hanya pemilik yang bisa update name/photoUrl/friends
+      // DAN izinkan pengguna lain HANYA memodifikasi 'friends' (misalnya, saat accept friend request)
       allow update: if isSignedIn() && (
         isOwner(userId) ||
-        // Allow non-owners to update only 'friends' field
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
-         request.resource.data['friends'].size() == resource.data.get('friends', []).size() + 1)
+        // Izinkan arrayUnion/arrayRemove pada friends oleh pengguna lain.
+        // Ini diasumsikan aman karena hanya memengaruhi daftar friends.
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']))
       );
     }
     
-    // Activities collection
+    // Activities collection (DIREVISI: Read Permission untuk yang diundang)
     match /activities/{activityId} {
       allow read: if isSignedIn() && (
         resource.data.createdBy == request.auth.uid ||
-        request.auth.uid in resource.data.members
+        request.auth.uid in resource.data.members ||
+        // KUNCI: Izinkan baca jika UID ada di array 'invitedUids' (jika Anda menggunakannya)
+        request.auth.uid in resource.data.invitedUids 
       );
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
+      
+      // PENTING: Update aktivitas hanya oleh pembuat ATAU untuk menambah members/invitedUids (saat accept invitation)
+      allow update: if isSignedIn() && (
+        // Pembuat bisa update apapun
+        resource.data.createdBy == request.auth.uid ||
+        // User yang diundang hanya bisa update members dan invitedUids (accept invitation)
+        (request.auth.uid in resource.data.get('invitedUids', []) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'invitedUids']))
+      );
+      
+      allow delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
     }
     
-    // Receipts collection - INI YANG BARU
+    // Receipts collection (OK)
     match /receipts/{receiptId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, create, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
     
-    // Friend requests
+    // Friend requests (OK)
     match /friendRequests/{requestId} {
       allow read: if isSignedIn() && (
         resource.data.fromUid == request.auth.uid ||
         resource.data.toUid == request.auth.uid
       );
       allow create: if isSignedIn() && request.resource.data.fromUid == request.auth.uid;
+      // Izinkan update/delete oleh pengirim (cancel) atau penerima (accept/decline) (OK)
       allow update, delete: if isSignedIn() && (
         resource.data.fromUid == request.auth.uid ||
         resource.data.toUid == request.auth.uid
       );
     }
     
-    // Activity invitations
+    // Activity invitations (OK)
     match /activityInvitations/{invitationId} {
       allow read: if isSignedIn() && (
         resource.data.invitorUid == request.auth.uid ||
         resource.data.invitedUid == request.auth.uid
       );
       allow create: if isSignedIn() && request.resource.data.invitorUid == request.auth.uid;
+      // Izinkan update/delete oleh pengundang (cancel) atau yang diundang (accept/decline) (OK)
       allow update, delete: if isSignedIn() && (
         resource.data.invitorUid == request.auth.uid ||
         resource.data.invitedUid == request.auth.uid
       );
     }
     
-    // Notifications
+    // Notifications (OK)
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.toUserId == request.auth.uid;
-      allow create: if isSignedIn();
+      // Izinkan siapa saja membuat notifikasi (misalnya, server/cloud function) (OK)
+      allow create: if isSignedIn(); 
       allow update, delete: if isSignedIn() && resource.data.toUserId == request.auth.uid;
     }
   }

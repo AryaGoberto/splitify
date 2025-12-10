@@ -81,7 +81,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       // Login ke Firebase
       await FirebaseAuth.instance.signInWithCredential(credential);
-
       if (!mounted) return;
 
       Navigator.pushReplacement(
