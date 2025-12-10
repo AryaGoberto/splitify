@@ -3,7 +3,7 @@ class AppConfig {
     // TODO: Replace dengan API key baru dari Google Cloud Console
     // Go to: https://console.cloud.google.com/apis/credentials
     // Ganti key di bawah dengan yang baru
-    const key = 'AIzaSyAsEnqqGF8TAv2m9wkOpSW3gWVO01zL5Ts';
+    const key = 'AIzaSyAl8oBkgF_gsvGB6ra5bo4_u3QfzUXDX28';
     return key;
   }
 

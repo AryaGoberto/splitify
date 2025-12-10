@@ -20,12 +20,21 @@ class GeminiOCRService {
       final mimeType = _getMimeType(extension);
 
       const prompt = '''
-Analyze this receipt/invoice image carefully. Extract menu items with their prices and quantities.
-Return ONLY valid JSON with no markdown, no explanations.
+You are an expert OCR system for Indonesian restaurant receipts/invoices. 
+Analyze this receipt/invoice image and extract ALL menu items with their prices.
+
+CRITICAL RULES:
+1. Extract EVERY single item with a price, even if it looks like subtotal/service/tax
+2. Item names can be in Indonesian or English (e.g., "Nasi Goreng", "Burger", "Soto")
+3. Prices are usually in Rupiah format: "Rp 35.000" or "35000" or "35K"
+4. Look for patterns like: [Item Name] ... [Price]
+5. If no items found but you see a total, create ONE item called "Pesanan" with that total
+
+Return ONLY valid JSON with no markdown, no explanations:
 
 {
   "items": [
-    {"name": "item name", "price": 45000, "quantity": 1},
+    {"name": "item name here", "price": 45000, "quantity": 1},
     {"name": "another item", "price": 50000, "quantity": 2}
   ],
   "subtotal": 120000,
@@ -33,15 +42,14 @@ Return ONLY valid JSON with no markdown, no explanations.
   "service_charge": 0,
   "discount": 0,
   "total": 120000,
-  "restaurant_name": "restaurant name",
+  "restaurant_name": "restaurant name if visible",
   "date": "date if visible"
 }
 
-Rules:
-- Extract ALL items with prices as whole numbers (35000, not "35.000")
-- Quantity defaults to 1 if not shown
-- Find subtotal, tax, service, discount, total
-- Return valid JSON ONLY, no other text
+OUTPUT FORMAT:
+- prices must be whole numbers (35000, not "35.000" or "Rp35K")
+- quantity defaults to 1 if not explicitly shown
+- return ONLY the JSON object, no other text
 ''';
 
       final response = await _model.generateContent([

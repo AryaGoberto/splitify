@@ -72,19 +72,14 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// KODE BARU: Auth Gate (Pemeriksa Status Login)
-// -----------------------------------------------------------------------------
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      // Memantau perubahan status otentikasi (login/logout)
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Tampilkan loading saat menunggu koneksi Firebase
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFF000518),
@@ -92,20 +87,14 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        // Jika user sudah login (User ada)
         if (snapshot.hasData && snapshot.data != null) {
-          // Navigasi ke Halaman Utama (Text Recognition/Home)
           return const DashboardScreen();
         }
-
-        // Jika user belum login (User null)
-        // Navigasi ke halaman Login
         return DashboardScreen();
       },
     );
   }
 }
-// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // KODE FITUR: Text Recognition Screen (Halaman Utama Setelah Login)

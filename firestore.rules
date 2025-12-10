@@ -49,9 +49,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
     }
     
-    // Receipts collection (OK)
+    // Receipts collection - FIXED: Separate create rule
     match /receipts/{receiptId} {
-      allow read, create, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
     
     // Friend requests (OK)
